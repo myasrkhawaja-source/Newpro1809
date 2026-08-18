@@ -1,0 +1,119 @@
+.home {
+  animation: fadeIn 0.5s;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero {
+  background: rgba(255, 255, 255, 0.74);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(124, 112, 255, 0.12);
+  padding: 70px 24px 54px;
+  text-align: center;
+  border-radius: 28px;
+  margin-bottom: 32px;
+  box-shadow: 0 20px 45px rgba(93, 74, 182, 0.12);
+}
+
+.hero h1 {
+  font-size: clamp(2.3rem, 5vw, 4.2rem);
+  margin-bottom: 18px;
+  background: linear-gradient(135deg, #5f52e5 0%, #c861ae 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.06em;
+}
+
+.hero p {
+  font-size: clamp(1rem, 2vw, 1.3rem);
+  color: #5d5874;
+  margin-bottom: 28px;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.7;
+}
+
+.hero-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 22px;
+  margin-bottom: 40px;
+}
+
+.feature-card {
+  background: rgba(255, 255, 255, 0.82);
+  padding: 30px 24px;
+  border-radius: 22px;
+  text-align: center;
+  box-shadow: 0 18px 35px rgba(80, 73, 124, 0.08);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  border: 1px solid rgba(116, 119, 255, 0.08);
+}
+
+.feature-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 22px 40px rgba(80, 73, 124, 0.12);
+}
+
+.feature-icon {
+  font-size: 52px;
+  margin-bottom: 15px;
+}
+
+.feature-card h3 {
+  color: #4d3cd8;
+  margin-bottom: 10px;
+  font-size: 22px;
+}
+
+.feature-card p {
+  color: #5f5d73;
+  line-height: 1.7;
+}
+
+.cta-section {
+  background: linear-gradient(135deg, rgba(255,255,255,0.82), rgba(248,235,255,0.9));
+  padding: 42px 24px;
+  border-radius: 28px;
+  text-align: center;
+  box-shadow: 0 18px 35px rgba(80, 73, 124, 0.08);
+  border: 1px solid rgba(116, 119, 255, 0.08);
+}
+
+.cta-section h2 {
+  color: #312b42;
+  margin-bottom: 20px;
+  font-size: clamp(1.5rem, 4vw, 2.4rem);
+}
+
+@media (max-width: 768px) {
+  .hero {
+    padding: 52px 18px 42px;
+  }
+
+  .hero-buttons {
+    flex-direction: column;
+  }
+
+  .hero-buttons .btn {
+    width: 100%;
+  }
+}
