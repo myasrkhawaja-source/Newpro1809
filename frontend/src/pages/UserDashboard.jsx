@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import './Dashboard.css';
+import { API_BASE } from '../config';
 
 function UserDashboard({ token, user }) {
   const [profile, setProfile] = useState(null);
@@ -8,6 +9,7 @@ function UserDashboard({ token, user }) {
   const [favorites, setFavorites] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -15,19 +17,24 @@ function UserDashboard({ token, user }) {
       if (!token) return;
 
       try {
-        const [profileRes, recommendationsRes, favoritesRes, bookingsRes, notificationsRes] = await Promise.all([
-          axios.get('http://localhost:5000/api/profile', { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get('http://localhost:5000/api/profile/recommendations', { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get('http://localhost:5000/api/favorites', { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get('http://localhost:5000/api/bookings/my-bookings', { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get('http://localhost:5000/api/notifications', { headers: { Authorization: `Bearer ${token}` } })
+        // allSettled: فشل طلب واحد ما يبوّظش باقي البيانات
+        const [profileRes, recommendationsRes, favoritesRes, bookingsRes, notificationsRes, ordersRes] = await Promise.allSettled([
+          axios.get(`${API_BASE}/profile`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API_BASE}/profile/recommendations`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API_BASE}/favorites`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API_BASE}/bookings/my-bookings`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API_BASE}/notifications`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API_BASE}/orders/my-orders`, { headers: { Authorization: `Bearer ${token}` } })
         ]);
 
-        setProfile(profileRes.data || null);
-        setRecommendations(recommendationsRes.data || { routine: [], products: [], services: [] });
-        setFavorites(favoritesRes.data || []);
-        setBookings(bookingsRes.data || []);
-        setNotifications(notificationsRes.data || []);
+        if (profileRes.status === 'fulfilled') setProfile(profileRes.value.data || null);
+        if (recommendationsRes.status === 'fulfilled') {
+          setRecommendations(recommendationsRes.value.data || { routine: [], products: [], services: [] });
+        }
+        if (favoritesRes.status === 'fulfilled') setFavorites(favoritesRes.value.data || []);
+        if (bookingsRes.status === 'fulfilled') setBookings(bookingsRes.value.data || []);
+        if (notificationsRes.status === 'fulfilled') setNotifications(notificationsRes.value.data || []);
+        if (ordersRes.status === 'fulfilled') setOrders(ordersRes.value.data || []);
       } catch (error) {
         console.error('Error loading user dashboard', error);
       } finally {
@@ -38,7 +45,7 @@ function UserDashboard({ token, user }) {
     fetchData();
   }, [token]);
 
-  const recentOrders = bookings.slice(0, 3);
+  const recentOrders = orders.slice(0, 3);
   const nextBooking = bookings.find((booking) => booking.status !== 'cancelled') || bookings[0];
   const unreadNotifications = notifications.filter((item) => !item.read).length;
 
@@ -79,7 +86,7 @@ function UserDashboard({ token, user }) {
           <div className="stat-icon">📦</div>
           <div>
             <span className="stat-label">Orders</span>
-            <strong>{bookings.length}</strong>
+            <strong>{orders.length}</strong>
           </div>
         </div>
 
@@ -110,14 +117,17 @@ function UserDashboard({ token, user }) {
           {recentOrders.length === 0 ? (
             <p className="panel-empty">No recent orders yet.</p>
           ) : (
-            recentOrders.map((booking) => (
-              <div key={booking._id} className="list-row">
+            recentOrders.map((order) => (
+              <div key={order._id} className="list-row">
                 <div>
-                  <strong>Order #{booking._id?.slice(-4) || 'New'}</strong>
-                  <p>{booking.serviceId?.name || 'Beauty Service'}</p>
+                  <strong>Order #{order._id?.slice(-4) || 'New'}</strong>
+                  <p>
+                    {order.items?.[0]?.name || 'Beauty Products'}
+                    {order.items?.length > 1 ? ` +${order.items.length - 1} more` : ''}
+                  </p>
                 </div>
-                <span className={`status-pill ${booking.status || 'pending'}`}>
-                  {booking.status || 'Pending'}
+                <span className={`status-pill ${order.status || 'pending'}`}>
+                  ₪{order.totalPrice} • {order.status || 'pending'}
                 </span>
               </div>
             ))

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
 import './Auth.css'
+import { API_BASE } from '../config'
 
 function ForgotPassword() {
   const [email, setEmail] = useState('')
@@ -15,7 +16,7 @@ function ForgotPassword() {
     setIsSubmitting(true)
 
     try {
-      await axios.post('http://localhost:5000/api/auth/forgot-password', { email })
+      await axios.post(`${API_BASE}/auth/forgot-password`, { email })
       setSent(true)
     } catch (err) {
       setError(err.response?.data?.message || 'Unable to send reset link')

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import './Services.css'
+import { API_BASE } from '../config'
 
 function Services({ addToCart, token, user }) {
   const [services, setServices] = useState([])
@@ -31,7 +32,7 @@ function Services({ addToCart, token, user }) {
 
   const fetchServices = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/services')
+      const response = await axios.get(`${API_BASE}/services`)
       setServices(response.data)
       setFilteredServices(response.data)
       setLoading(false)
@@ -87,7 +88,7 @@ function Services({ addToCart, token, user }) {
         notes: bookingData.notes
       }
 
-      const response = await axios.post('http://localhost:5000/api/bookings', bookingPayload, {
+      const response = await axios.post(`${API_BASE}/bookings`, bookingPayload, {
         headers: { Authorization: `Bearer ${token}` }
       })
 

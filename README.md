@@ -53,6 +53,8 @@ npm run dev
 
 ## 🔐 متغيرات البيئة
 
+### Backend
+
 أنشئ ملف `.env` داخل مجلد backend كما في المثال التالي:
 
 ```env
@@ -66,6 +68,20 @@ SMTP_PORT=587
 SMTP_USER=your_email@gmail.com
 SMTP_PASS=your_app_password
 ```
+
+> يمكن وضع أكثر من رابط في `CLIENT_URL` مفصولة بفاصلة، مثال:
+> `CLIENT_URL=https://beauty-hub.vercel.app,http://localhost:3000`
+
+### Frontend
+
+الواجهة تستخدم مسارات نسبية (`/api`) في التطوير عبر بروكسي Vite، فلا تحتاج أي إعداد.
+في الإنتاج اضبط متغيراً واحداً فقط (انظر `frontend/.env.example`):
+
+```env
+VITE_API_URL=https://your-backend.onrender.com
+```
+
+اتركه فارغاً إذا كان الباك إند يقدّم الواجهة المبنية من نفس النطاق.
 
 ## 🧪 الاختبار
 

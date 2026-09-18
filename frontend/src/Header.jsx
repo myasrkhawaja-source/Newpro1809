@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import './Header.css'
+import './components/Header.css'
+import { assetUrl } from './config'
 
 function Header({ user, setUser, token, setToken, cart }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -50,12 +51,33 @@ function Header({ user, setUser, token, setToken, cart }) {
                 className="account-trigger"
                 onClick={() => setAccountMenuOpen(!accountMenuOpen)}
               >
+                {user?.avatar && (
+                  <img
+                    src={assetUrl(user.avatar)}
+                    alt=""
+                    className="header-avatar"
+                  />
+                )}
                 Account ▾
               </button>
 
               {accountMenuOpen && (
                 <div className="account-dropdown">
-                  <Link to="/user-dashboard" onClick={() => setAccountMenuOpen(false)}>Dashboard</Link>
+                {user?.role === 'admin' ? (
+  <Link
+    to="/dashboard"
+    onClick={() => setAccountMenuOpen(false)}
+  >
+    Admin Dashboard
+  </Link>
+) : (
+  <Link
+    to="/user-dashboard"
+    onClick={() => setAccountMenuOpen(false)}
+  >
+    Dashboard
+  </Link>
+)}
                   <Link to="/profile" onClick={() => setAccountMenuOpen(false)}>Profile</Link>
                   <Link to="/favorites" onClick={() => setAccountMenuOpen(false)}>Favorites</Link>
                   <Link to="/bookings" onClick={() => setAccountMenuOpen(false)}>Bookings</Link>

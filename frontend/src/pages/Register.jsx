@@ -1,9 +1,19 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import './Auth.css'
+import './Social.css'
+import { API_BASE, API_ORIGIN } from '../config'
+
+const BACKEND = API_ORIGIN
+const SOCIAL_MESSAGES = {
+  not_configured: '⚠️ تسجيل الدخول عبر {p} غير مفعّل على السيرفر حالياً — سجّل بالبريد الإلكتروني، أو أضف مفاتيح API في ملف .env لتفعيله.',
+  failed: '❌ تعذّر إكمال تسجيل الدخول عبر {p}، حاول مرة أخرى.',
+  no_email: '⚠️ حساب {p} لم يشارك البريد الإلكتروني — اسمح بالوصول للإيميل وحاول مجدداً.'
+}
 
 function Register({ setUser, setToken }) {
+  const [searchParams] = useSearchParams()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -14,13 +24,20 @@ function Register({ setUser, setToken }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const navigate = useNavigate()
 
+  // رسالة نتيجة محاولة الدخول الاجتماعي (لو في)
+  const socialParam = searchParams.get('social')
+  const provider = searchParams.get('provider')
+  const socialNotice = socialParam && SOCIAL_MESSAGES[socialParam]
+    ? SOCIAL_MESSAGES[socialParam].replace('{p}', provider === 'facebook' ? 'فيسبوك' : 'جوجل')
+    : ''
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setIsSubmitting(true)
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/register', formData)
+      const response = await axios.post(`${API_BASE}/auth/register`, formData)
       const { token, user } = response.data
 
       localStorage.setItem('token', token)
@@ -37,7 +54,22 @@ function Register({ setUser, setToken }) {
   return (
     <div className="auth-container">
       <h2>Join Beauty Hub</h2>
+
+      {socialNotice && <div className="social-notice">{socialNotice}</div>}
       {error && <div className="error">{error}</div>}
+
+      {/* تسجيل اجتماعي */}
+      <div className="social-buttons">
+        <a className="social-btn google" href={`${BACKEND}/api/auth/google`}>
+          <span className="social-icon">G</span> المتابعة مع Google
+        </a>
+        <a className="social-btn facebook" href={`${BACKEND}/api/auth/facebook`}>
+          <span className="social-icon">f</span> المتابعة مع Facebook
+        </a>
+      </div>
+
+      <div className="social-divider"><span>أو سجّل بالبريد الإلكتروني</span></div>
+
       <form onSubmit={handleSubmit}>
         <div className="form-group">
           <label>Full Name</label>

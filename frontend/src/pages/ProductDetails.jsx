@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
+import { API_BASE } from '../config'
 
 function ProductDetails({ addToCart, token }) {
   const { id } = useParams()
@@ -14,9 +15,9 @@ function ProductDetails({ addToCart, token }) {
   useEffect(() => {
     const fetchProduct = async () => {
       try {
-        const response = await axios.get(`http://localhost:5000/api/products/${id}`)
+        const response = await axios.get(`${API_BASE}/products/${id}`)
         setProduct(response.data)
-        const reviewResponse = await axios.get(`http://localhost:5000/api/reviews/product/${id}`)
+        const reviewResponse = await axios.get(`${API_BASE}/reviews/product/${id}`)
         setReviews(reviewResponse.data)
       } catch (err) {
         setError('Product not found or could not be loaded.')
@@ -33,6 +34,22 @@ function ProductDetails({ addToCart, token }) {
     navigate('/cart')
   }
 
+  const handleAddToFavorites = async () => {
+    if (!token) {
+      navigate('/login', { state: { from: `/products/${id}` } })
+      return
+    }
+    try {
+      await axios.post(`${API_BASE}/favorites`, {
+        itemId: id,
+        itemType: 'product'
+      }, { headers: { Authorization: `Bearer ${token}` } })
+      alert('Added to your favorites ❤️')
+    } catch (err) {
+      alert(err.response?.data?.message || 'Could not add to favorites')
+    }
+  }
+
   const handleReviewSubmit = async (event) => {
     event.preventDefault()
 
@@ -42,7 +59,7 @@ function ProductDetails({ addToCart, token }) {
     }
 
     try {
-      await axios.post('http://localhost:5000/api/reviews', {
+      await axios.post(`${API_BASE}/reviews`, {
         targetType: 'product',
         targetId: id,
         rating: Number(reviewForm.rating),
@@ -51,7 +68,7 @@ function ProductDetails({ addToCart, token }) {
         headers: { Authorization: `Bearer ${token}` }
       })
 
-      const reviewResponse = await axios.get(`http://localhost:5000/api/reviews/product/${id}`)
+      const reviewResponse = await axios.get(`${API_BASE}/reviews/product/${id}`)
       setReviews(reviewResponse.data)
       setReviewForm({ rating: 5, comment: '' })
     } catch (err) {
@@ -122,6 +139,7 @@ function ProductDetails({ addToCart, token }) {
 
           <div className="detail-actions">
             <button className="btn btn-primary" onClick={handleAddToCart}>Add to Cart</button>
+            <button className="btn btn-secondary" onClick={handleAddToFavorites}>❤ Favorite</button>
             <Link to="/products" className="btn btn-secondary">Back to Products</Link>
           </div>
         </div>

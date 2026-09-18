@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import { API_BASE } from '../config';
 
 function NotificationCenter({ token }) {
   const [notifications, setNotifications] = useState([]);
@@ -10,7 +11,7 @@ function NotificationCenter({ token }) {
 
     const fetchNotifications = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/notifications', {
+        const response = await axios.get(`${API_BASE}/notifications`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setNotifications(response.data || []);
@@ -28,7 +29,7 @@ function NotificationCenter({ token }) {
     if (!token) return;
 
     try {
-      await axios.patch(`http://localhost:5000/api/notifications/${id}/read`, {}, {
+      await axios.patch(`${API_BASE}/notifications/${id}/read`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
 

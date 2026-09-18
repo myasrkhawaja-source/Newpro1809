@@ -1,0 +1,83 @@
+/* ==== أزرار تسجيل الدخول الاجتماعي ==== */
+.social-buttons {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.social-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 11px 16px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  border: 1px solid #ddd6f7;
+  background: #fff;
+  color: #2d2a45;
+  transition: all 0.15s;
+}
+
+.social-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(80, 60, 180, 0.12); }
+
+.social-btn.google { border-color: #dbe4ff; }
+.social-btn.google .social-icon {
+  background: #fff;
+  color: #db4437;
+  border: 1.5px solid #db4437;
+}
+.social-btn.google:hover { border-color: #db4437; }
+
+.social-btn.facebook { background: #1877f2; border-color: #1877f2; color: #fff; }
+.social-btn.facebook .social-icon { background: #fff; color: #1877f2; }
+.social-btn.facebook:hover { background: #0f6ae0; }
+
+.social-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.social-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: #8a86a3;
+  font-size: 12.5px;
+}
+
+.social-divider::before,
+.social-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e4e0f5;
+}
+
+.social-notice {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fff7e0;
+  color: #8a6d1a;
+  font-size: 13.5px;
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
+/* صورة المستخدم الصغيرة في الهيدر */
+.header-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid #7c6cff;
+}

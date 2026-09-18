@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import './BeautyQuiz.css'
+import { API_BASE } from '../config'
 
 function BeautyQuiz({ token }) {
   const [step, setStep] = useState(0)
@@ -74,7 +75,7 @@ function BeautyQuiz({ token }) {
       }
 
       if (token) {
-        await axios.post('http://localhost:5000/api/profile', profileData, {
+        await axios.post(`${API_BASE}/profile`, profileData, {
           headers: { Authorization: `Bearer ${token}` }
         })
       }

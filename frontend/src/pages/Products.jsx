@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import './Products.css'
+import { API_BASE } from '../config'
 
-function Products() {
+function Products({ addToCart, token }) {
+  const navigate = useNavigate()
   const [products, setProducts] = useState([])
   const [filteredProducts, setFilteredProducts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -21,7 +24,7 @@ function Products() {
 
   const fetchProducts = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/products')
+      const response = await axios.get(`${API_BASE}/products`)
       setProducts(response.data)
       setFilteredProducts(response.data)
       setLoading(false)
@@ -57,6 +60,22 @@ function Products() {
     }
 
     setFilteredProducts(filtered)
+  }
+
+  const toggleFavorite = async (product) => {
+    if (!token) {
+      navigate('/login', { state: { from: '/products' } })
+      return
+    }
+    try {
+      await axios.post(`${API_BASE}/favorites`, {
+        itemId: product._id,
+        itemType: 'product'
+      }, { headers: { Authorization: `Bearer ${token}` } })
+      alert(`${product.name} added to your favorites ❤️`)
+    } catch (err) {
+      alert(err.response?.data?.message || 'Could not add to favorites')
+    }
   }
 
   if (loading) return <div className="loading">Loading products...</div>
@@ -121,8 +140,11 @@ function Products() {
                     <span className="product-original-price">₪{product.originalPrice}</span>
                   )}
                 </div>
-                <button className="btn btn-primary" style={{width: '100%', marginTop: '10px'}}>
+                <button className="btn btn-primary" style={{width: '100%', marginTop: '10px'}} onClick={() => addToCart(product, 'product')}>
                   Add to Cart
+                </button>
+                <button className="btn btn-secondary" style={{width: '100%', marginTop: '8px'}} onClick={() => toggleFavorite(product)}>
+                  ❤ Add to Favorites
                 </button>
               </div>
             </div>
@@ -134,3 +156,4 @@ function Products() {
 }
 
 
+export default Products

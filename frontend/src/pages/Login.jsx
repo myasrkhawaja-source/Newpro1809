@@ -2,6 +2,10 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import './Auth.css'
+import './Social.css'
+import { API_BASE, API_ORIGIN } from '../config'
+
+const BACKEND = API_ORIGIN
 
 function Login({ setUser, setToken }) {
   const [formData, setFormData] = useState({
@@ -19,7 +23,7 @@ function Login({ setUser, setToken }) {
     setIsSubmitting(true)
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/login', formData)
+      const response = await axios.post(`${API_BASE}/auth/login`, formData)
       const { token, user } = response.data
 
       localStorage.setItem('token', token)
@@ -38,6 +42,18 @@ function Login({ setUser, setToken }) {
   return (
     <div className="auth-container">
       <h2>Login to Beauty Hub</h2>
+
+      <div className="social-buttons">
+        <a className="social-btn google" href={`${BACKEND}/api/auth/google`}>
+          <span className="social-icon">G</span> المتابعة مع Google
+        </a>
+        <a className="social-btn facebook" href={`${BACKEND}/api/auth/facebook`}>
+          <span className="social-icon">f</span> المتابعة مع Facebook
+        </a>
+      </div>
+
+      <div className="social-divider"><span>أو سجّل الدخول بالبريد</span></div>
+
       {error && <div className="error">{error}</div>}
       <form onSubmit={handleSubmit}>
         <div className="form-group">

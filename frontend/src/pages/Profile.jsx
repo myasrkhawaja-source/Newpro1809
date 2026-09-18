@@ -1,59 +1,111 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import './Profile.css'
+import { API_BASE, API_ORIGIN } from '../config'
 
-function Profile({ user, token }) {
-  const [profile, setProfile] = useState(null)
+const API = API_BASE
+const BACKEND = API_ORIGIN
+
+function Profile({ user, setUser, token }) {
+  const [beauty, setBeauty] = useState(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
-  const [formData, setFormData] = useState({
-    skinType: '',
-    hairType: '',
-    budget: '',
-    preferences: {
-      style: '',
-      occasion: '',
-      concerns: []
-    }
+  const [uploading, setUploading] = useState(false)
+  const [message, setMessage] = useState('')
+  const fileRef = useRef(null)
+
+  const [form, setForm] = useState({
+    name: user?.name || '',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    city: user?.location?.city || '',
+    address: user?.location?.address || ''
   })
 
   useEffect(() => {
-    if (token) {
-      fetchProfile()
+    if (!token) return
+    const load = async () => {
+      try {
+        // نجيب أحدث بيانات الحساب + البروفايل الجمالي
+        const [meRes, beautyRes] = await Promise.allSettled([
+          axios.get(`${API}/profile/me`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API}/profile`, { headers: { Authorization: `Bearer ${token}` } })
+        ])
+        if (meRes.status === 'fulfilled') {
+          const u = meRes.value.data
+          syncUser(u)
+          setForm({
+            name: u.name || '',
+            email: u.email || '',
+            phone: u.phone || '',
+            city: u.location?.city || '',
+            address: u.location?.address || ''
+          })
+        }
+        if (beautyRes.status === 'fulfilled') setBeauty(beautyRes.value.data)
+      } finally {
+        setLoading(false)
+      }
     }
+    load()
   }, [token])
 
-  const fetchProfile = async () => {
+  // نحدث نسخة المستخدم في حالة التطبيق (وlocalStorage تلقائياً)
+  const syncUser = (u) => setUser?.({ ...(user || {}), ...u, avatar: u.avatar || '' })
+
+  const avatarUrl = user?.avatar
+    ? (user.avatar.startsWith('http') ? user.avatar : `${BACKEND}${user.avatar}`)
+    : null
+
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
+
+  // حفظ تعديلات الحساب (الاسم/الإيميل/التلفون/العنوان)
+  const handleSave = async (e) => {
+    e.preventDefault()
+    setMessage('')
     try {
-      const response = await axios.get('http://localhost:5000/api/profile', {
+      const res = await axios.put(`${API}/profile/account`, form, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      setProfile(response.data)
-      if (response.data) {
-        setFormData({
-          skinType: response.data.skinType || '',
-          hairType: response.data.hairType || '',
-          budget: response.data.budget || '',
-          preferences: response.data.preferences || { style: '', occasion: '', concerns: [] }
-        })
-      }
-      setLoading(false)
+      syncUser(res.data.user)
+      setEditing(false)
+      setMessage('✅ تم حفظ التعديلات بنجاح')
+      setTimeout(() => setMessage(''), 3000)
     } catch (err) {
-      setLoading(false)
+      setMessage('❌ ' + (err.response?.data?.message || 'حدث خطأ أثناء الحفظ'))
     }
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  // رفع صورة البروفايل
+  const handleAvatar = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    setMessage('')
     try {
-      const response = await axios.post('http://localhost:5000/api/profile', formData, {
+      const data = new FormData()
+      data.append('avatar', file)
+      const res = await axios.post(`${API}/profile/avatar`, data, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+      })
+      syncUser(res.data.user)
+      setMessage('✅ تم تحديث الصورة')
+      setTimeout(() => setMessage(''), 3000)
+    } catch (err) {
+      setMessage('❌ ' + (err.response?.data?.message || 'فشل رفع الصورة'))
+    } finally {
+      setUploading(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  const removeAvatar = async () => {
+    try {
+      const res = await axios.delete(`${API}/profile/avatar`, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      setProfile(response.data)
-      setEditing(false)
-    } catch (err) {
-      console.error('Error updating profile:', err)
-    }
+      syncUser(res.data.user)
+    } catch { /* تجاهل */ }
   }
 
   if (!token) {
@@ -71,144 +123,102 @@ function Profile({ user, token }) {
 
   return (
     <div className="profile-container">
-      <div className="profile-header">
-        <h1>My Profile 👤</h1>
-        {!editing && (
-          <button onClick={() => setEditing(true)} className="btn btn-primary">Edit Profile</button>
+      <h1>حسابي 👤</h1>
+      {message && <div className="profile-message">{message}</div>}
+
+      {/* صورة البروفايل */}
+      <div className="profile-section avatar-section">
+        <div className="avatar-wrap">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="Profile" className="avatar-img" />
+          ) : (
+            <div className="avatar-placeholder">{(user?.name || '؟').charAt(0)}</div>
+          )}
+          <button
+            type="button"
+            className="avatar-edit-btn"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            title="تغيير الصورة"
+          >
+            📷
+          </button>
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          hidden
+          onChange={handleAvatar}
+        />
+        <div className="avatar-actions">
+          <strong>{user?.name}</strong>
+          <span>{uploading ? 'جاري الرفع...' : 'JPG / PNG / WEBP — حتى 2MB'}</span>
+          {avatarUrl && <button className="link-danger" onClick={removeAvatar}>حذف الصورة</button>}
+        </div>
+      </div>
+
+      {/* الملف الشخصي */}
+      <div className="profile-section">
+        <div className="section-head">
+          <h2>الملف الشخصي</h2>
+          {!editing && (
+            <button onClick={() => setEditing(true)} className="btn btn-primary btn-sm">تعديل</button>
+          )}
+        </div>
+
+        {!editing ? (
+          <div className="profile-info">
+            <div className="info-item"><span className="info-label">الاسم:</span><span className="info-value">{user?.name}</span></div>
+            <div className="info-item"><span className="info-label">البريد الإلكتروني:</span><span className="info-value">{user?.email}</span></div>
+            <div className="info-item"><span className="info-label">الهاتف المحمول:</span><span className="info-value">{user?.phone || 'لم يتم الإضافة'}</span></div>
+            <div className="info-item"><span className="info-label">المدينة:</span><span className="info-value">{user?.location?.city || 'لم تتم الإضافة'}</span></div>
+            <div className="info-item"><span className="info-label">العنوان:</span><span className="info-value">{user?.location?.address || 'ليس لديك عنوان محفوظ'}</span></div>
+          </div>
+        ) : (
+          <form onSubmit={handleSave} className="profile-form">
+            <div className="form-row">
+              <div className="form-group">
+                <label>الاسم</label>
+                <input name="name" value={form.name} onChange={handleChange} required />
+              </div>
+              <div className="form-group">
+                <label>البريد الإلكتروني</label>
+                <input name="email" type="email" value={form.email} onChange={handleChange} required />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>رقم التلفون</label>
+                <input name="phone" type="tel" value={form.phone} onChange={handleChange} placeholder="05xxxxxxxx" />
+              </div>
+              <div className="form-group">
+                <label>المدينة</label>
+                <input name="city" value={form.city} onChange={handleChange} placeholder="مثال: الناصرة" />
+              </div>
+            </div>
+            <div className="form-group">
+              <label>العنوان</label>
+              <input name="address" value={form.address} onChange={handleChange} placeholder="الشارع، رقم البناية..." />
+            </div>
+            <div className="form-actions">
+              <button type="submit" className="btn btn-primary">حفظ التعديلات</button>
+              <button type="button" onClick={() => setEditing(false)} className="btn btn-secondary">إلغاء</button>
+            </div>
+          </form>
         )}
       </div>
 
-      {!editing ? (
-        <div className="profile-content">
-          <div className="profile-section">
-            <h2>Personal Information</h2>
-            <div className="profile-info">
-              <div className="info-item">
-                <span className="info-label">Name:</span>
-                <span className="info-value">{user?.name}</span>
-              </div>
-              <div className="info-item">
-                <span className="info-label">Email:</span>
-                <span className="info-value">{user?.email}</span>
-              </div>
-            </div>
+      {/* بروفايل الجمال */}
+      {beauty && (
+        <div className="profile-section">
+          <h2>بروفايل الجمال 💜</h2>
+          <div className="profile-info">
+            <div className="info-item"><span className="info-label">نوع البشرة:</span><span className="info-value">{beauty.skinType}</span></div>
+            <div className="info-item"><span className="info-label">نوع الشعر:</span><span className="info-value">{beauty.hairType}</span></div>
+            <div className="info-item"><span className="info-label">الميزانية:</span><span className="info-value">₪{beauty.budget}</span></div>
           </div>
-
-          {profile && (
-            <div className="profile-section">
-              <h2>Beauty Profile</h2>
-              <div className="profile-info">
-                <div className="info-item">
-                  <span className="info-label">Skin Type:</span>
-                  <span className="info-value">{profile.skinType}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Hair Type:</span>
-                  <span className="info-value">{profile.hairType}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Budget:</span>
-                  <span className="info-value">₪{profile.budget}</span>
-                </div>
-                {profile.preferences && (
-                  <>
-                    <div className="info-item">
-                      <span className="info-label">Style:</span>
-                      <span className="info-value">{profile.preferences.style}</span>
-                    </div>
-                    <div className="info-item">
-                      <span className="info-label">Occasion:</span>
-                      <span className="info-value">{profile.preferences.occasion}</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
         </div>
-      ) : (
-        <form onSubmit={handleSubmit} className="profile-form">
-          <div className="form-group">
-            <label>Skin Type</label>
-            <select
-              value={formData.skinType}
-              onChange={(e) => setFormData({...formData, skinType: e.target.value})}
-              required
-            >
-              <option value="">Select skin type</option>
-              <option value="oily">Oily</option>
-              <option value="dry">Dry</option>
-              <option value="combination">Combination</option>
-              <option value="sensitive">Sensitive</option>
-              <option value="normal">Normal</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>Hair Type</label>
-            <select
-              value={formData.hairType}
-              onChange={(e) => setFormData({...formData, hairType: e.target.value})}
-              required
-            >
-              <option value="">Select hair type</option>
-              <option value="straight">Straight</option>
-              <option value="wavy">Wavy</option>
-              <option value="curly">Curly</option>
-              <option value="coily">Coily</option>
-              <option value="damaged">Damaged</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>Monthly Budget (₪)</label>
-            <input
-              type="number"
-              value={formData.budget}
-              onChange={(e) => setFormData({...formData, budget: e.target.value})}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Preferred Style</label>
-            <select
-              value={formData.preferences.style}
-              onChange={(e) => setFormData({
-                ...formData,
-                preferences: {...formData.preferences, style: e.target.value}
-              })}
-            >
-              <option value="">Select style</option>
-              <option value="natural">Natural</option>
-              <option value="glamorous">Glamorous</option>
-              <option value="bold">Bold/Edgy</option>
-              <option value="classic">Classic</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>Occasion</label>
-            <select
-              value={formData.preferences.occasion}
-              onChange={(e) => setFormData({
-                ...formData,
-                preferences: {...formData.preferences, occasion: e.target.value}
-              })}
-            >
-              <option value="">Select occasion</option>
-              <option value="university">University/Daily</option>
-              <option value="party">Party</option>
-              <option value="wedding">Wedding</option>
-              <option value="work">Work</option>
-            </select>
-          </div>
-
-          <div className="form-actions">
-            <button type="submit" className="btn btn-primary">Save Changes</button>
-            <button type="button" onClick={() => setEditing(false)} className="btn btn-secondary">Cancel</button>
-          </div>
-        </form>
       )}
     </div>
   )

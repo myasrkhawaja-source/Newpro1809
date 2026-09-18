@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import Header from './components/Header'
+import Header from './Header';
 import Home from './pages/Home'
 import Products from './pages/Products'
 import ProductDetails from './pages/ProductDetails'
@@ -22,9 +22,11 @@ import Dashboard from './pages/Dashboard'
 import UserDashboard from './pages/UserDashboard'
 import NotificationCenter from './pages/NotificationCenter'
 import OrderHistory from './pages/OrderHistory'
+import SocialCallback from './pages/SocialCallback'
 import AdminDashboard from './pages/AdminDashboard'
 import Footer from './components/Footer'
 import ProtectedRoute from './components/ProtectedRoute'
+import AIAssistant from './components/AIAssistant'
 
 function App() {
   const location = useLocation()
@@ -67,7 +69,16 @@ function App() {
           setToken(null)
           setUser(null)
 
-          const protectedRoutes = ['/profile', '/favorites', '/bookings', '/dashboard']
+          const protectedRoutes = [
+            '/profile',
+            '/favorites',
+            '/bookings',
+            '/dashboard',
+            '/user-dashboard',
+            '/notifications',
+            '/order-history',
+            '/admin'
+          ]
           if (protectedRoutes.includes(location.pathname)) {
             navigate('/login', { state: { from: location.pathname } })
           }
@@ -140,7 +151,7 @@ function App() {
           <Route path="/products" element={<Products addToCart={addToCart} token={token} />} />
           <Route path="/products/:id" element={<ProductDetails addToCart={addToCart} token={token} />} />
           <Route path="/services" element={<Services addToCart={addToCart} token={token} user={user} />} />
-          <Route path="/services/:id" element={<ServiceDetails addToCart={addToCart} />} />
+          <Route path="/services/:id" element={<ServiceDetails addToCart={addToCart} token={token} />} />
           <Route path="/cart" element={<Cart cart={cart} updateCartItem={updateCartItem} removeFromCart={removeFromCart} clearCart={clearCart} token={token} />} />
           <Route path="/checkout" element={<Checkout cart={cart} token={token} clearCart={clearCart} />} />
           <Route path="/quiz" element={<BeautyQuiz />} />
@@ -149,7 +160,8 @@ function App() {
           <Route path="/register" element={<Register setUser={setUser} setToken={setToken} />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/profile" element={<ProtectedRoute token={token}><Profile user={user} token={token} /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute token={token}><Profile user={user} setUser={setUser} token={token} /></ProtectedRoute>} />
+          <Route path="/social-callback" element={<SocialCallback setUser={setUser} setToken={setToken} />} />
           <Route path="/favorites" element={<ProtectedRoute token={token}><Favorites token={token} /></ProtectedRoute>} />
           <Route path="/bookings" element={<ProtectedRoute token={token}><Bookings token={token} /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute token={token}><Dashboard user={user} token={token} /></ProtectedRoute>} />
@@ -159,6 +171,7 @@ function App() {
           <Route path="/admin" element={<ProtectedRoute token={token}><AdminDashboard user={user} token={token} /></ProtectedRoute>} />
         </Routes>
       </div>
+      <AIAssistant token={token} user={user} />
       <Footer />
     </div>
   )

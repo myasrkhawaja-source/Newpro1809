@@ -167,3 +167,120 @@
     flex-direction: column;
   }
 }
+/* ==== إضافات الملف الشخصي الجديد ==== */
+
+.profile-message {
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #f0edff;
+  color: #4a3ec8;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+/* صورة البروفايل */
+.avatar-section {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.avatar-wrap {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  flex-shrink: 0;
+}
+
+.avatar-img,
+.avatar-placeholder {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #7c6cff;
+}
+
+.avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #7c6cff, #b06ae0);
+  color: #fff;
+  font-size: 38px;
+  font-weight: 700;
+}
+
+.avatar-edit-btn {
+  position: absolute;
+  bottom: -2px;
+  left: -2px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: #7c6cff;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s;
+}
+
+.avatar-edit-btn:hover { transform: scale(1.12); }
+.avatar-edit-btn:disabled { opacity: 0.6; cursor: wait; }
+
+.avatar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: #6b6785;
+}
+
+.avatar-actions strong { font-size: 17px; color: #2d2a45; }
+
+.link-danger {
+  background: none;
+  border: none;
+  color: #e03131;
+  cursor: pointer;
+  font-size: 13px;
+  text-align: start;
+  padding: 0;
+  text-decoration: underline;
+  width: fit-content;
+}
+
+/* رأس القسم + زر التعديل */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.section-head h2 { margin: 0; }
+
+.btn-sm { padding: 6px 18px; font-size: 13px; }
+
+/* النموذج */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+@media (max-width: 560px) {
+  .form-row { grid-template-columns: 1fr; }
+  .avatar-section { flex-direction: column; text-align: center; }
+  .avatar-actions { align-items: center; }
+}

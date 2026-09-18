@@ -36,7 +36,9 @@ router.post('/register', async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
+        phone: user.phone || '',
+        role: user.role,
+        avatar: user.avatar || ''
       }
     });
   } catch (error) {
@@ -67,7 +69,9 @@ router.post('/login', async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
+        phone: user.phone || '',
+        role: user.role,
+        avatar: user.avatar || ''
       }
     });
   } catch (error) {
@@ -145,5 +149,118 @@ router.post('/reset-password', async (req, res) => {
     res.status(500).json({ message: 'Error resetting password', error: error.message });
   }
 });
+
+// ===============================================================
+// 🔗 تسجيل الدخول الاجتماعي — Google & Facebook
+// شغال فعلياً بمجرد إضافة المفاتيح في .env:
+//   GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET
+//   FACEBOOK_APP_ID / FACEBOOK_APP_SECRET
+// لو المفاتيح مش موجودة → بيرجّع المستخدم لصفحة التسجيل برسالة
+// ===============================================================
+
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5000';
+const EMAIL_RE = /^\S+@\S+\.\S+$/;
+
+const socialProvider = (name) => ({
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+    tokenUrl: 'https://oauth2.googleapis.com/token',
+    userUrl: 'https://www.googleapis.com/oauth2/v3/userinfo',
+    scope: 'openid email profile',
+    redirectUri: `${BACKEND_URL}/api/auth/google/callback`
+  },
+  facebook: {
+    clientId: process.env.FACEBOOK_APP_ID,
+    clientSecret: process.env.FACEBOOK_APP_SECRET,
+    authUrl: 'https://www.facebook.com/v19.0/dialog/oauth',
+    tokenUrl: 'https://graph.facebook.com/v19.0/oauth/access_token',
+    userUrl: 'https://graph.facebook.com/me?fields=id,name,email,picture.width(256).height(256)',
+    scope: 'email public_profile',
+    redirectUri: `${BACKEND_URL}/api/auth/facebook/callback`
+  }
+}[name]);
+
+// بدء تسجيل الدخول — لو مش مفعّل نرجّع المستخدم لصفحة التسجيل برسالة
+router.get('/:provider(google|facebook)', (req, res) => {
+  const p = socialProvider(req.params.provider);
+
+  if (!p?.clientId || !p?.clientSecret) {
+    return res.redirect(`${CLIENT_URL}/register?social=not_configured&provider=${req.params.provider}`);
+  }
+
+  const params = new URLSearchParams({
+    client_id: p.clientId,
+    redirect_uri: p.redirectUri,
+    response_type: 'code',
+    scope: p.scope
+  });
+  if (req.params.provider === 'google') params.append('access_type', 'offline');
+  res.redirect(`${p.authUrl}?${params}`);
+});
+
+// الكولباك — نستبدل الكود بمعلومات المستخدم ونعمل حساب تلقائي
+async function handleSocialCallback(req, res, providerName) {
+  try {
+    const p = socialProvider(providerName);
+    const code = req.query.code;
+
+    if (!code) {
+      return res.redirect(`${CLIENT_URL}/register?social=failed&provider=${providerName}`);
+    }
+
+    // 1) استبدال الكود بـ access token
+    const tokenRes = await fetch(p.tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: p.clientId,
+        client_secret: p.clientSecret,
+        redirect_uri: p.redirectUri,
+        grant_type: 'authorization_code'
+      })
+    });
+    const tokenData = await tokenRes.json();
+    if (!tokenData.access_token) {
+      return res.redirect(`${CLIENT_URL}/register?social=failed&provider=${providerName}`);
+    }
+
+    // 2) جلب بيانات المستخدم
+    const userRes = await fetch(p.userUrl, {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` }
+    });
+    const profile = await userRes.json();
+
+    const email = profile.email?.toLowerCase();
+    if (!email || !EMAIL_RE.test(email)) {
+      return res.redirect(`${CLIENT_URL}/register?social=no_email&provider=${providerName}`);
+    }
+
+    // 3) إيجاد أو إنشاء الحساب
+    let user = await User.findOne({ email });
+    if (!user) {
+      user = await User.create({
+        name: profile.name || email.split('@')[0],
+        email,
+        // باسورد عشوائي مش هيتستخدم (الدخول عن طريق البروفايدر)
+        password: crypto.randomBytes(24).toString('hex'),
+        phone: profile.phone || '',
+        avatar: profile.picture || ''
+      });
+    }
+
+    // 4) إصدار JWT وتحويل المستخدم للواجهة
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '7d' });
+    res.redirect(`${CLIENT_URL}/social-callback?token=${token}`);
+  } catch (error) {
+    res.redirect(`${CLIENT_URL}/register?social=failed&provider=${providerName}`);
+  }
+}
+
+router.get('/google/callback', (req, res) => handleSocialCallback(req, res, 'google'));
+router.get('/facebook/callback', (req, res) => handleSocialCallback(req, res, 'facebook'));
 
 module.exports = router;

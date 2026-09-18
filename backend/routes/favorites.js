@@ -1,8 +1,10 @@
 const express = require('express');
 const Favorite = require('../models/Favorite');
+const Product = require('../models/Product');
+const Service = require('../models/Service');
 const router = express.Router();
 
-// Get user's favorites
+// جلب مفضلات المستخدم مع تفاصيل العناصر
 router.get('/', async (req, res) => {
   try {
     const userId = req.user?.id;
@@ -10,16 +12,37 @@ router.get('/', async (req, res) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const favorites = await Favorite.find({ userId })
-      .populate('itemId');
+    const favorites = await Favorite.find({ userId }).sort({ createdAt: -1 });
 
-    res.json(favorites);
+    const populatedFavorites = await Promise.all(
+      favorites.map(async (favorite) => {
+        const plain = favorite.toObject();
+        if (favorite.itemType === 'product') {
+          plain.itemId = await Product.findById(favorite.itemId).select('name price brand image category description');
+        } else {
+          plain.itemId = await Service.findById(favorite.itemId).select('name price images duration category description location');
+        }
+        return plain;
+      })
+    );
+
+    // تنظيف المفضلات التي حُذفت عناصرها من قاعدة البيانات
+    const validFavorites = populatedFavorites.filter((favorite) => favorite.itemId);
+    const removedIds = populatedFavorites
+      .filter((favorite) => !favorite.itemId)
+      .map((favorite) => favorite._id);
+
+    if (removedIds.length > 0) {
+      await Favorite.deleteMany({ _id: { $in: removedIds } });
+    }
+
+    res.json(validFavorites);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching favorites', error: error.message });
   }
 });
 
-// Add to favorites
+// إضافة للمفضلات (بدون تكرار)
 router.post('/', async (req, res) => {
   try {
     const { itemId, itemType } = req.body;
@@ -29,26 +52,44 @@ router.post('/', async (req, res) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const favorite = new Favorite({
-      userId,
-      itemId,
-      itemType
-    });
+    if (!itemId || !['product', 'service'].includes(itemType)) {
+      return res.status(400).json({ message: 'itemId and a valid itemType (product/service) are required' });
+    }
 
-    await favorite.save();
+    const ItemModel = itemType === 'product' ? Product : Service;
+    const itemExists = await ItemModel.findById(itemId);
+    if (!itemExists) {
+      return res.status(404).json({ message: 'Item not found' });
+    }
+
+    const existing = await Favorite.findOne({ userId, itemId, itemType });
+    if (existing) {
+      return res.status(200).json({ message: 'Already in favorites', favorite: existing });
+    }
+
+    const favorite = await Favorite.create({ userId, itemId, itemType });
     res.status(201).json(favorite);
   } catch (error) {
     res.status(500).json({ message: 'Error adding to favorites', error: error.message });
   }
 });
 
-// Remove from favorites
+// حذف من المفضلات (يعمل مع معرف المفضلة أو معرف العنصر مباشرة)
 router.delete('/:id', async (req, res) => {
   try {
-    const favorite = await Favorite.findByIdAndDelete(req.params.id);
+    const userId = req.user?.id;
+
+    let favorite = await Favorite.findOne({ _id: req.params.id, userId });
+
+    if (!favorite) {
+      favorite = await Favorite.findOne({ itemId: req.params.id, userId });
+    }
+
     if (!favorite) {
       return res.status(404).json({ message: 'Favorite not found' });
     }
+
+    await favorite.deleteOne();
     res.json({ message: 'Removed from favorites' });
   } catch (error) {
     res.status(500).json({ message: 'Error removing from favorites', error: error.message });

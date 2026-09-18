@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import './Auth.css'
+import { API_BASE } from '../config'
 
 function ResetPassword() {
   const [searchParams] = useSearchParams()
@@ -35,7 +36,7 @@ function ResetPassword() {
     setIsSubmitting(true)
 
     try {
-      await axios.post('http://localhost:5000/api/auth/reset-password', { token, password })
+      await axios.post(`${API_BASE}/auth/reset-password`, { token, password })
       setSuccess(true)
     } catch (err) {
       setError(err.response?.data?.message || 'Unable to reset password')

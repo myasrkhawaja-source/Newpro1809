@@ -2,61 +2,47 @@ const express = require('express');
 const Booking = require('../models/Booking');
 const Service = require('../models/Service');
 const Notification = require('../models/Notification');
-const { 
-  sendEmail,
-  sendOrderConfirmationEmail, 
-  sendBookingConfirmationEmail, 
-  sendProviderNotificationEmail, 
-  sendPaymentConfirmationEmail 
-} = require('../utils/email');
+
 const router = express.Router();
 
-// Get user's bookings
-router.get('/my-bookings', async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
+// التحقق من صيغة الوقت (HH:MM) وضمن ساعات العمل 09:00 - 20:00
+const isValidTime = (time) => {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time || '');
+  if (!match) return false;
+  const minutes = Number(match[1]) * 60 + Number(match[2]);
+  return minutes >= 9 * 60 && minutes <= 20 * 60;
+};
 
-    const bookings = await Booking.find({ userId })
-      .populate('serviceId')
-      .populate('providerId', 'name email')
-      .sort({ date: -1 });
-
-    res.json(bookings);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching bookings', error: error.message });
-  }
-});
-
-// Get provider's bookings
-router.get('/provider-bookings', async (req, res) => {
-  try {
-    const providerId = req.user?.id;
-    if (!providerId) {
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
-
-    const bookings = await Booking.find({ providerId })
-      .populate('serviceId')
-      .populate('userId', 'name email')
-      .sort({ date: -1 });
-
-    res.json(bookings);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching bookings', error: error.message });
-  }
-});
-
-// Create booking
+// إنشاء حجز جديد (خدمة بموعد محدد)
 router.post('/', async (req, res) => {
   try {
-    const { serviceId, date, time, notes, location } = req.body;
+    const { serviceId, date, time, location, notes } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
       return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    if (!serviceId || !date || !time) {
+      return res.status(400).json({ message: 'Service, date, and time are required' });
+    }
+
+    if (!isValidTime(time)) {
+      return res.status(400).json({ message: 'Working hours are 09:00 - 20:00. Please choose a valid time (e.g. 14:30).' });
+    }
+
+    const requestedDate = new Date(date);
+    if (Number.isNaN(requestedDate.getTime())) {
+      return res.status(400).json({ message: 'Invalid date format' });
+    }
+
+    const dayStart = new Date(requestedDate);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(requestedDate);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    if (dayEnd < new Date()) {
+      return res.status(400).json({ message: 'Cannot book an appointment in the past' });
     }
 
     const service = await Service.findById(serviceId);
@@ -64,46 +50,47 @@ router.post('/', async (req, res) => {
       return res.status(404).json({ message: 'Service not found' });
     }
 
-    const booking = new Booking({
+    if (service.available === false) {
+      return res.status(400).json({ message: 'This service is currently unavailable' });
+    }
+
+    // منع تعارض المواعيد لنفس المزود في نفس اليوم والوقت
+    const conflict = await Booking.findOne({
+      providerId: service.providerId,
+      date: { $gte: dayStart, $lte: dayEnd },
+      time,
+      status: { $ne: 'cancelled' }
+    });
+
+    if (conflict) {
+      return res.status(409).json({ message: 'This time slot is already booked. Please choose another time.' });
+    }
+
+    const booking = await Booking.create({
       userId,
       serviceId,
       providerId: service.providerId,
-      date,
+      date: dayStart,
       time,
-      location,
-      notes,
-      totalPrice: service.price
+      location: {
+        city: location?.city || service.location?.city || '',
+        address: location?.address || service.location?.address || ''
+      },
+      totalPrice: service.price,
+      notes: notes || ''
     });
 
-    await booking.save();
-
-    const populatedBooking = await Booking.findById(booking._id)
-      .populate('serviceId')
-      .populate('providerId', 'name email')
-      .populate('userId', 'name email');
-
-    // Send confirmation email to customer
-    if (populatedBooking?.userId?.email) {
-      await sendBookingConfirmationEmail(populatedBooking.userId.email, populatedBooking);
-    }
-
-    // Send notification email to provider
-    if (populatedBooking?.providerId?.email) {
-      await sendProviderNotificationEmail(
-        populatedBooking.providerId.email, 
-        populatedBooking, 
-        populatedBooking.providerId.name
-      );
-
-      // Create notification for provider
+    // إشعار داخلي للمستخدم
+    try {
       await Notification.create({
-        userId: populatedBooking.providerId._id,
-        title: 'New Booking Request',
-        message: `New booking from ${populatedBooking.userId.name} for ${populatedBooking.serviceId.name} on ${new Date(populatedBooking.date).toLocaleDateString()}`,
-        type: 'provider',
-        bookingId: populatedBooking._id,
-        read: false
+        userId,
+        title: 'Booking Confirmed 📅',
+        message: `Your booking for "${service.name}" on ${dayStart.toDateString()} at ${time} has been received.`,
+        type: 'booking',
+        bookingId: booking._id
       });
+    } catch (notificationError) {
+      console.error('Notification error:', notificationError.message);
     }
 
     res.status(201).json(booking);
@@ -112,155 +99,127 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update booking status
-router.put('/:id/status', async (req, res) => {
+// حجوزات المستخدم الحالي
+router.get('/my-bookings', async (req, res) => {
   try {
-    const { status } = req.body;
-    const booking = await Booking.findByIdAndUpdate(req.params.id, { status }, { new: true });
-    if (!booking) {
-      return res.status(404).json({ message: 'Booking not found' });
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
     }
-    res.json(booking);
+
+    const bookings = await Booking.find({ userId })
+      .populate('serviceId', 'name price duration category description images')
+      .populate('providerId', 'name email')
+      .sort({ createdAt: -1 });
+
+    res.json(bookings);
   } catch (error) {
-    res.status(500).json({ message: 'Error updating booking', error: error.message });
+    res.status(500).json({ message: 'Error fetching bookings', error: error.message });
   }
 });
 
-// Cancel booking
+// إلغاء حجز
 router.delete('/:id', async (req, res) => {
   try {
-    const userId = req.user?.id;
-    const booking = await Booking.findById(req.params.id);
+    const booking = await Booking.findOne({ _id: req.params.id, userId: req.user.id });
 
     if (!booking) {
       return res.status(404).json({ message: 'Booking not found' });
     }
 
-    if (booking.userId.toString() !== userId && booking.providerId.toString() !== userId) {
-      return res.status(403).json({ message: 'Unauthorized' });
+    if (booking.status === 'cancelled') {
+      return res.status(400).json({ message: 'Booking is already cancelled' });
     }
 
-    if (['completed', 'cancelled'].includes(booking.status)) {
-      return res.status(400).json({ message: 'Cannot cancel this booking' });
+    if (booking.status === 'completed') {
+      return res.status(400).json({ message: 'Completed bookings cannot be cancelled' });
     }
 
     booking.status = 'cancelled';
     await booking.save();
-    res.json({ message: 'Booking cancelled', booking });
+
+    res.json({ message: 'Booking cancelled successfully', booking });
   } catch (error) {
     res.status(500).json({ message: 'Error cancelling booking', error: error.message });
   }
 });
 
-// Add review to booking
+// إضافة مراجعة لحجز
 router.post('/:id/review', async (req, res) => {
   try {
     const { rating, text } = req.body;
-    const userId = req.user?.id;
+    const booking = await Booking.findOne({ _id: req.params.id, userId: req.user.id });
 
-    if (!userId) {
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
-
-    if (rating < 1 || rating > 5) {
-      return res.status(400).json({ message: 'Rating must be between 1 and 5' });
-    }
-
-    const booking = await Booking.findById(req.params.id);
-    if (!booking || booking.userId.toString() !== userId) {
+    if (!booking) {
       return res.status(404).json({ message: 'Booking not found' });
     }
 
-    if (booking.status !== 'completed') {
-      return res.status(400).json({ message: 'Can only review completed bookings' });
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: 'Rating must be between 1 and 5' });
     }
 
     booking.review = {
       rating,
-      text,
+      text: text || '',
       createdAt: new Date()
     };
-
     await booking.save();
-    res.json({ message: 'Review added', booking });
+
+    // إعادة حساب تقييم الخدمة بناءً على كل المراجعات
+    const stats = await Booking.aggregate([
+      { $match: { serviceId: booking.serviceId, 'review.rating': { $exists: true } } },
+      { $group: { _id: null, avg: { $avg: '$review.rating' }, count: { $sum: 1 } } }
+    ]);
+
+    if (stats.length > 0) {
+      await Service.findByIdAndUpdate(booking.serviceId, {
+        rating: Math.round(stats[0].avg * 10) / 10,
+        reviewCount: stats[0].count
+      });
+    }
+
+    res.json(booking);
   } catch (error) {
-    res.status(500).json({ message: 'Error adding review', error: error.message });
+    res.status(500).json({ message: 'Error submitting review', error: error.message });
   }
 });
 
-// Process payment
+// الدفع لحجز
 router.post('/:id/payment', async (req, res) => {
   try {
     const { paymentMethod } = req.body;
-    const userId = req.user?.id;
+    const booking = await Booking.findOne({ _id: req.params.id, userId: req.user.id });
 
-    const booking = await Booking.findById(req.params.id)
-      .populate('userId', 'name email')
-      .populate('serviceId')
-      .populate('providerId', 'name email');
-
-    if (!booking || booking.userId._id.toString() !== userId) {
+    if (!booking) {
       return res.status(404).json({ message: 'Booking not found' });
     }
 
-    if (booking.status === 'cancelled') {
-      return res.status(400).json({ message: 'Cannot pay for cancelled booking' });
+    if (booking.paymentStatus === 'paid') {
+      return res.status(400).json({ message: 'This booking is already paid' });
     }
 
     booking.paymentStatus = 'paid';
-    booking.paymentMethod = paymentMethod;
+    booking.paymentMethod = paymentMethod || 'card';
     booking.status = 'confirmed';
-
     await booking.save();
 
-    // Send payment confirmation email to customer
-    if (booking.userId?.email) {
-      await sendPaymentConfirmationEmail(booking.userId.email, booking);
-    }
-
-    // Create notification for customer
-    await Notification.create({
-      userId: booking.userId._id,
-      title: 'Payment Confirmed',
-      message: `Payment of ₪${booking.totalPrice} for ${booking.serviceId.name} has been confirmed`,
-      type: 'payment',
-      bookingId: booking._id,
-      read: false
-    });
-
-    // Notify provider about confirmation
-    if (booking.providerId?.email) {
-      await sendEmail({ 
-        to: booking.providerId.email,
-        subject: 'Beauty Hub - Booking Confirmed by Customer',
-        html: `
-          <div style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #4dcc90;">✅ Booking Confirmed</h2>
-            <p>Hi ${booking.providerId.name},</p>
-            <p>${booking.userId.name} has confirmed the booking for ${booking.serviceId.name}.</p>
-            <p><strong>Date:</strong> ${new Date(booking.date).toLocaleDateString()}</p>
-            <p><strong>Time:</strong> ${booking.time}</p>
-            <p><strong>Payment Status:</strong> Confirmed</p>
-            <p>Please prepare for this appointment.</p>
-          </div>
-        `
-      });
-
-      // Create notification for provider
+    try {
       await Notification.create({
-        userId: booking.providerId._id,
-        title: 'Booking Confirmed by Customer',
-        message: `Booking from ${booking.userId.name} for ${booking.serviceId.name} has been confirmed and payment received`,
-        type: 'booking',
-        bookingId: booking._id,
-        read: false
+        userId: booking.userId,
+        title: 'Payment Successful 💳',
+        message: `Your payment of ₪${booking.totalPrice} was received. The booking is now confirmed.`,
+        type: 'payment',
+        bookingId: booking._id
       });
+    } catch (notificationError) {
+      console.error('Notification error:', notificationError.message);
     }
 
-    res.json({ message: 'Payment processed', booking });
+    res.json(booking);
   } catch (error) {
     res.status(500).json({ message: 'Error processing payment', error: error.message });
   }
 });
 
 module.exports = router;
+

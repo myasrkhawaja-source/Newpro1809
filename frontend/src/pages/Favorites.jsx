@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import './Favorites.css'
+import { API_BASE } from '../config'
 
 function Favorites({ token }) {
   const [favorites, setFavorites] = useState([])
@@ -14,7 +15,7 @@ function Favorites({ token }) {
 
   const fetchFavorites = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/favorites', {
+      const response = await axios.get(`${API_BASE}/favorites`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       setFavorites(response.data)
@@ -26,7 +27,7 @@ function Favorites({ token }) {
 
   const removeFavorite = async (id) => {
     try {
-      await axios.delete(`http://localhost:5000/api/favorites/${id}`, {
+      await axios.delete(`${API_BASE}/favorites/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       setFavorites(favorites.filter(fav => fav._id !== id))

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import { API_BASE } from '../config';
 
 function OrderHistory({ token }) {
   const [orders, setOrders] = useState([]);
@@ -10,7 +11,7 @@ function OrderHistory({ token }) {
 
     const fetchOrders = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/bookings/my-bookings', {
+        const response = await axios.get(`${API_BASE}/orders/my-orders`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setOrders(response.data || []);
@@ -37,30 +38,35 @@ function OrderHistory({ token }) {
       {orders.length === 0 ? (
         <div className="no-bookings">
           <p>You have no order history yet.</p>
+          <a href="/products" className="btn btn-primary">Browse Products</a>
         </div>
       ) : (
         <div className="bookings-list">
           {orders.map((order) => (
             <div key={order._id} className="booking-card">
               <div className="booking-header">
-                <h3>{order.serviceId?.name || 'Beauty Service'}</h3>
-                <span className="booking-status" style={{ backgroundColor: order.status === 'cancelled' ? '#ff6b6b' : '#51cf66' }}>
+                <h3>🛍️ Order #{order._id?.slice(-6)}</h3>
+                <span
+                  className="booking-status"
+                  style={{ backgroundColor: order.status === 'cancelled' ? '#ff6b6b' : '#51cf66' }}
+                >
                   {order.status}
                 </span>
               </div>
 
               <div className="booking-details">
-                <div className="booking-info">
-                  <p>📅 {new Date(order.date).toLocaleDateString()}</p>
-                  <p>⏰ {order.time}</p>
-                  <p>💰 ₪{order.totalPrice}</p>
-                </div>
-
-                {order.serviceId?.description && (
-                  <div className="booking-description">
-                    <p>{order.serviceId.description}</p>
+                {order.items?.map((item, index) => (
+                  <div className="booking-info" key={`${item.product}-${index}`}>
+                    <p>💄 {item.name}</p>
+                    <p>{item.quantity} × ₪{item.price} = ₪{item.price * item.quantity}</p>
                   </div>
-                )}
+                ))}
+
+                <div className="booking-info" style={{ borderTop: '1px solid #e6e0ff', paddingTop: '8px' }}>
+                  <p><strong>Total: ₪{order.totalPrice}</strong></p>
+                  <p>💳 {order.paymentMethod || 'card'} • {order.paymentStatus}</p>
+                  <p>📅 {new Date(order.createdAt).toLocaleDateString()}</p>
+                </div>
               </div>
             </div>
           ))}
@@ -71,3 +77,4 @@ function OrderHistory({ token }) {
 }
 
 export default OrderHistory;
+

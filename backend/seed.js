@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+﻿const mongoose = require('mongoose');
 const User = require('./models/User');
 const Product = require('./models/Product');
 const Service = require('./models/Service');
@@ -40,13 +40,12 @@ const seedData = async () => {
     console.log('Default admin ready:', adminUser.email, '/ admin12345');
 
     // Create sample users
-    const hashedPassword = await bcrypt.hash('password123', 10);
-    
+    // ملاحظة: كلمة المرور تُشفَّر تلقائياً بواسطة pre-save hook في User model — لا نشفرها يدوياً هنا
     const users = await User.create([
       {
         name: 'Sarah Ahmed',
         email: 'sarah@example.com',
-        password: hashedPassword,
+        password: 'password123',
         phone: '050-1234567',
         role: 'user',
         location: { city: 'Nazareth', address: 'Main Street 123' }
@@ -54,7 +53,7 @@ const seedData = async () => {
       {
         name: 'Layla Hassan',
         email: 'layla@example.com',
-        password: hashedPassword,
+        password: 'password123',
         phone: '052-7654321',
         role: 'provider',
         location: { city: 'Nazareth', address: 'Beauty Center, Floor 2' }
@@ -62,7 +61,7 @@ const seedData = async () => {
       {
         name: 'Maya Cohen',
         email: 'maya@example.com',
-        password: hashedPassword,
+        password: 'password123',
         phone: '054-9876543',
         role: 'provider',
         location: { city: 'Haifa', address: 'Downtown Beauty Studio' }
@@ -227,6 +226,54 @@ const seedData = async () => {
       }
     ]);
     console.log('Created services');
+
+    // ===== بيانات تجريبية إضافية: مفضلات + حجوزات + طلبات =====
+    const Favorite = require('./models/Favorite');
+    const Order = require('./models/Order');
+    const Booking = require('./models/Booking');
+
+    await Favorite.deleteMany({});
+    await Booking.deleteMany({});
+    await Order.deleteMany({});
+
+    const sarah = users[0];
+
+    await Favorite.create([
+      { userId: sarah._id, itemId: products[0]._id, itemType: 'product' },
+      { userId: sarah._id, itemId: products[1]._id, itemType: 'product' },
+      { userId: sarah._id, itemId: services[0]._id, itemType: 'service' }
+    ]);
+    console.log('Created sample favorites');
+
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 3);
+    futureDate.setHours(0, 0, 0, 0);
+
+    await Booking.create({
+      userId: sarah._id,
+      serviceId: services[1]._id,
+      providerId: services[1].providerId,
+      date: futureDate,
+      time: '14:00',
+      location: { city: services[1].location?.city || 'Nazareth', address: services[1].location?.address || '' },
+      status: 'pending',
+      totalPrice: services[1].price,
+      notes: 'Sample booking'
+    });
+    console.log('Created sample booking');
+
+    await Order.create({
+      userId: sarah._id,
+      items: [
+        { product: products[0]._id, name: products[0].name, price: products[0].price, quantity: 2 },
+        { product: products[1]._id, name: products[1].name, price: products[1].price, quantity: 1 }
+      ],
+      totalPrice: products[0].price * 2 + products[1].price,
+      status: 'confirmed',
+      paymentStatus: 'paid',
+      paymentMethod: 'card'
+    });
+    console.log('Created sample order');
 
     console.log('\n✅ Seed data created successfully!');
     console.log('\n📋 Sample Users:');

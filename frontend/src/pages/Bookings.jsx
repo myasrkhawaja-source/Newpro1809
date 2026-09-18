@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import './Bookings.css'
+import { API_BASE } from '../config'
 
 function Bookings({ token }) {
   const [bookings, setBookings] = useState([])
@@ -19,7 +20,7 @@ function Bookings({ token }) {
 
   const fetchBookings = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/bookings/my-bookings', {
+      const response = await axios.get(`${API_BASE}/bookings/my-bookings`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       setBookings(response.data)
@@ -33,7 +34,7 @@ function Bookings({ token }) {
   const cancelBooking = async (id) => {
     if (window.confirm('Are you sure you want to cancel this booking?')) {
       try {
-        await axios.delete(`http://localhost:5000/api/bookings/${id}`, {
+        await axios.delete(`${API_BASE}/bookings/${id}`, {
           headers: { Authorization: `Bearer ${token}` }
         })
         setBookings(bookings.map(b => b._id === id ? { ...b, status: 'cancelled' } : b))
@@ -45,7 +46,7 @@ function Bookings({ token }) {
 
   const handleReviewSubmit = async (bookingId) => {
     try {
-      await axios.post(`http://localhost:5000/api/bookings/${bookingId}/review`, reviewData, {
+      await axios.post(`${API_BASE}/bookings/${bookingId}/review`, reviewData, {
         headers: { Authorization: `Bearer ${token}` }
       })
       setBookings(bookings.map(b => 
@@ -60,7 +61,7 @@ function Bookings({ token }) {
 
   const handlePayment = async (bookingId) => {
     try {
-      await axios.post(`http://localhost:5000/api/bookings/${bookingId}/payment`, 
+      await axios.post(`${API_BASE}/bookings/${bookingId}/payment`, 
         { paymentMethod },
         { headers: { Authorization: `Bearer ${token}` } }
       )

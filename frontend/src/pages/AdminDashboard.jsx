@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import './Dashboard.css';
+import { API_BASE } from '../config';
 
 const emptyProduct = {
   name: '',
@@ -25,7 +26,7 @@ function AdminDashboard({ user, token }) {
   const [productForm, setProductForm] = useState(emptyProduct);
   const [editingId, setEditingId] = useState(null);
 
-  const API = 'http://localhost:5000/api/admin';
+  const API = `${API_BASE}/admin`;
 
   const getAuthConfig = () => ({
     headers: { Authorization: `Bearer ${token}` }
